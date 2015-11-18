@@ -27,6 +27,7 @@ target_deploy_file(${DIR} _floor/planks_normal.tga)
 # Deploying differents obj
 target_deploy_file(${DIR} _mesh/tangle_cube.obj)
 target_deploy_file(${DIR} _mesh/cube.obj)
+
 target_deploy_file(${DIR} _mesh/sphere.obj)
 target_deploy_file(${DIR} _mesh/tea.obj)
 target_deploy_file(${DIR} _mesh/csm_cubes.obj)
