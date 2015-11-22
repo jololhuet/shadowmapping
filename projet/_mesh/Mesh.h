@@ -1,5 +1,6 @@
 #pragma once
 #include "icg_common.h"
+#include <list>
 #include "../attrib_locations.h"
 
 bool rotate_cube = false;
@@ -9,6 +10,8 @@ protected:
     GLuint _vao; ///< vertex array object
     vec3 _color; ///< Mesh Color
     opengp::Surface_mesh _mesh;
+
+    Surface_mesh::Vertex_property<Point> vpoint;
 
 public:
     void init(const char* obj = "tangle_cube.obj"){
@@ -24,7 +27,7 @@ public:
 
         ///--- Vertex coordinates
         {
-            Surface_mesh::Vertex_property<Point> vpoint = _mesh.get_vertex_property<Point>("v:point");
+            vpoint = _mesh.get_vertex_property<Point>("v:point");
             GLuint vbo;
             glGenBuffers(1, &vbo);
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -80,5 +83,22 @@ public:
 
         ///--- Draw
         glDrawElements(GL_TRIANGLES, 3 * _mesh.n_faces(), GL_UNSIGNED_INT, ZERO_BUFFER_OFFSET);
+    }
+
+    void getVertices (std::list<std::vector<float> >& mesh_points/*, mat4& model*/) {
+        Surface_mesh::Vertex_iterator vit;
+        mat4 model = mat4::Identity();
+        for (vit = _mesh.vertices_begin(); vit != _mesh.vertices_end(); ++vit)
+        {
+            vec3 vp = vpoint[*vit];
+            vec4 vpoint_model = model * vec4(vp.x(), vp.y(), vp.z(), 1.0);
+
+            std::vector<float> p(3);
+            p[0] = vpoint_model.x();
+            p[1] = vpoint_model.y();
+            p[2] = vpoint_model.z();
+
+            mesh_points.push_back(p);
+        }
     }
 };

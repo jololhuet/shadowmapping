@@ -4,6 +4,7 @@
 #include "attrib_locations.h"
 #include "_floor/Floor.h"
 #include "_mesh/Mesh.h"
+#include "Miniball.hpp"
 
 
 /**
@@ -43,7 +44,8 @@ Mesh csm_scene;
 GLuint default_pid;  // Handle for the default shader program
 GLuint shadow_pid;  // Handle for the shadow map generation shader program
 
-GLuint csm_pid;     // Handle for the cascaded shadow mapping
+bool _use_csm = false;
+
 GLuint vsm_pid;     // Handle for the variance shadow mapping
 GLuint bias_pid;    // Handle for the bias shadow map
 GLuint filter_pid;  // Handle for the filtered shadow map
@@ -52,8 +54,6 @@ GLuint depth_pid;   // Handle to print the depths shadow map
 bool use_polygon_offset = false;
 bool use_normal_offset = false;
 bool use_slope_bias = true;
-
-bool isCSM = false;
 
 GLuint depth_tex;  // Handle for the shadow map
 GLuint depthVSM_tex;  // Handle for the shadow map
@@ -75,12 +75,12 @@ mat4 light_projection;  // Projection matrix for light source
 
 mat4 offset_matrix;  // Affine transformation to map components from [-1, 1] to [0, 1], defined in init()
 
-float bias = 0.01f;
+float bias = 0.005f;
 int prev_buffer_size;
-int buffer_size = 1024;
+int buffer_size = 512;
 
-float pcfSpread = 700.0;
-float shadow_darkness = 0.15;
+float pcfSpread = 600.0;
+float shadow_darkness = 0.20;
 
 float vsmBlurRadius = 0.01;
 int vsmBlurSteps = 4;
@@ -94,6 +94,14 @@ GLfloat old_near = _near_pane;
 GLfloat old_far = _far_pane;
 GLfloat old_fovy = _fovy;
 GLfloat old_aspect = _aspect;
+
+//Miniball
+typedef std::list<std::vector<float> >::const_iterator PointIterator;
+typedef std::vector<float>::const_iterator CoordIterator;
+
+typedef Miniball::Miniball <
+        Miniball::CoordAccessor<PointIterator, CoordIterator> >
+        MB;
 
 
 mat4 PerspectiveProjection(float fovy, float aspect, float near, float far){
@@ -171,7 +179,7 @@ void moveAll() {
         trans = trans * Eigen::Affine3f(Eigen::Translation3f(vec3(0.0f, 0.0f, velocity*d_time))).matrix();
     }
 
-    if (isCSM) {
+    if (_use_csm) {
         view_CSM = view_CSM * trans;
     } else {
         view = view * trans;
@@ -276,8 +284,8 @@ void keyboard(int key, int action){
 
         case '4':
             if(action != GLFW_RELEASE) return;
-            default_pid = csm_pid;
-            std::cout<<"Mode CSM"<<std::endl<<std::flush;
+            _use_csm = !_use_csm;
+            std::cout<<"CSM scene"<<std::endl<<std::flush;
             break;
 
         default:
@@ -339,11 +347,33 @@ void TW_CALL NormalOffsetGet (void *value, void *clientData)
     *(bool *)value = use_normal_offset;  // for instance
 }
 
+// MINIBALL stuff
+void createFrustum (vec3 center, float radius) {
+
+    // Get camera position from view matrix
+    vec3 cameraPosition = vec3(view.col(3)[0], view.col(3)[1], view.col(3)[2]);
+
+    vec3 diff = center - cameraPosition;
+    float distance = sqrt(diff.dot(diff));
+
+    float near = distance - radius;
+    float far = distance + radius;
+    float aspect = (float)width/(float)height;
+    float fovy = 2 * asin(radius/distance) * 180.0f/ M_PI;
+
+    cout << "near : " << near << endl;
+    cout << "far : " << far << endl;
+    cout << "aspect : " << aspect << endl;
+    cout << "fovy : " << fovy << endl;
+
+    projection = PerspectiveProjection(fovy, aspect, near, far);
+}
 
 void init() {
     light_dir = vec3(-5.0, 10.0, 5.0);
     light_pos = vec3(light_dir); //vec3(2.0, 3.0, 0.0);
     light_dir.normalize();
+
 
 #ifdef WITH_ANTTWEAKBAR
     TwInit(TW_OPENGL_CORE, NULL);
@@ -380,10 +410,10 @@ void init() {
     glBindAttribLocation(depth_pid, ATTRIB_LOC_vtexcoord, "vtexcoord");
     glLinkProgram(depth_pid);
 
-    csm_pid = opengp::load_shaders("csm_vshader.glsl", "csm_fshader.glsl");
-    glBindAttribLocation(csm_pid, ATTRIB_LOC_vpoint, "vpoint");
-    glBindAttribLocation(csm_pid, ATTRIB_LOC_vtexcoord, "vtexcoord");
-    glLinkProgram(csm_pid);
+//    csm_pid = opengp::load_shaders("csm_vshader.glsl", "csm_fshader.glsl");
+//    glBindAttribLocation(csm_pid, ATTRIB_LOC_vpoint, "vpoint");
+//    glBindAttribLocation(csm_pid, ATTRIB_LOC_vtexcoord, "vtexcoord");
+//    glLinkProgram(csm_pid);
 
     vsm_pid = opengp::load_shaders("vsm_vshader.glsl", "vsm_fshader.glsl");
     glBindAttribLocation(vsm_pid, ATTRIB_LOC_vpoint, "vpoint");
@@ -407,15 +437,35 @@ void init() {
 
     glViewport(0,0,width,height);
 
-    float ratio = width / (float) height;
-    projection = PerspectiveProjection(45.0f, ratio, 0.1f, 100.0f);
     view = Eigen::Affine3f(Eigen::Translation3f(0.0f, 0.1f, -4.0f)).matrix();
+    projection = PerspectiveProjection(45.0f, width/(float)height, 0.1f, 100.0f);
     view_CSM = Eigen::Affine3f(Eigen::Translation3f(0.0f, -0.5f, -5.0f)).matrix();
 
-    default_pid = csm_pid;
-    glUseProgram(default_pid);
-    glUniformMatrix4fv(glGetUniformLocation(default_pid, "projection"), 1, GL_FALSE, projection.data());
-    glUniform1i(glGetUniformLocation(default_pid, "shadow_map"), 1/*GL_TEXTURE1*/);
+    csm_scene.init("csm_cubes.obj");
+    tea.init("tea.obj");
+    tangle_cube.init();
+    sphere.init("sphere.obj");
+
+    ground_floor.init();
+    wall.init("cube.obj");
+
+    std::list<std::vector<float> > all_points;
+    tea.getVertices(all_points);
+    tangle_cube.getVertices(all_points);
+    sphere.getVertices(all_points);
+    wall.getVertices(all_points);
+
+    MB mb (3, all_points.begin(), all_points.end());
+
+    float ball_radius = sqrt(mb.squared_radius());
+    vec3 center = vec3(mb.center());
+
+    createFrustum(center, ball_radius);
+
+//    default_pid = csm_pid;
+//    glUseProgram(default_pid);
+//    glUniformMatrix4fv(glGetUniformLocation(default_pid, "projection"), 1, GL_FALSE, projection.data());
+//    glUniform1i(glGetUniformLocation(default_pid, "shadow_map"), 1/*GL_TEXTURE1*/);
 
     default_pid = depth_pid;
     glUseProgram(default_pid);
@@ -451,12 +501,6 @@ void init() {
 
     check_error_gl();
 
-
-    csm_scene.init("csm_cubes.obj");
-    tea.init("tea.obj");
-    tangle_cube.init();
-    sphere.init("sphere.obj");
-
     sb.setSize(buffer_size, buffer_size);
     prev_buffer_size = buffer_size;
     vec2 texs = sb.init();
@@ -465,12 +509,6 @@ void init() {
 
     check_error_gl();
 
-    ground_floor.init();
-    wall.init("cube.obj");
-}
-
-void makeTightFrustum () {
-    //Do not know yet -- Preprocessing
 }
 
 // Split the frustum into 2 smaller frustums
@@ -488,6 +526,24 @@ void splitFrustum ()  {
     }
 }
 
+mat4 createTransMatrix (float t1, float t2, float t3) {
+    return Eigen::Affine3f(Eigen::Translation3f(vec3(t1, t2, t3))).matrix();
+}
+
+mat4 createScaleMatrix(float s1, float s2, float s3) {
+    mat4 scale;
+    scale <<    s1,  0.0f,  0.0f,  0.0f,
+              0.0f,  s2,    0.0f,  0.0f,
+              0.0f,  0.0f,  s3,    0.0f,
+              0.0f,  0.0f,  0.0f,  1.0f;
+
+    return scale;
+}
+
+mat4 generateModelMatrix (mat4& trans, mat4& scale) {
+    return trans * scale;
+}
+
 void display() {
     check_error_gl();
 
@@ -498,15 +554,15 @@ void display() {
     check_error_gl();
 
     // Default scene
-    mat4 cube_scale;
-    mat4 sphere_scale;
-    mat4 tea_scale;
-    mat4 wall_scale;
+    mat4 cube_scale = createScaleMatrix(0.65, 0.65, 0.65);
+    mat4 sphere_scale = createScaleMatrix(0.30, 0.30, 0.30);;
+    mat4 tea_scale = createScaleMatrix(0.10, 0.10, 0.10);;
+    mat4 wall_scale = createScaleMatrix(0.08, 0.80, 2.0);;
 
-    mat4 cube_trans;
-    mat4 sphere_trans;
-    mat4 tea_trans;
-    mat4 wall_trans;
+    mat4 cube_trans = createTransMatrix(0.0f, 0.33f, 0.0f);
+    mat4 sphere_trans = createTransMatrix(-0.8f, 1.0f, 0.3f);
+    mat4 tea_trans = createTransMatrix(-0.6f, 0.00f, -0.5f);
+    mat4 wall_trans = createTransMatrix(-1.0f, 0.0f, -1.0f);
 
     mat4 cube_model_matrix;
     mat4 sphere_model_matrix;
@@ -520,46 +576,12 @@ void display() {
 
     mat4 csm_model_matrix;
 
-    isCSM = default_pid == csm_pid;
-    if (!isCSM) {
-    // Scaling matrix to scale the differents mesh down to a reasonable size.
-    float sc = 0.65;
-    cube_scale << sc,    0.0f,  0.0f,  0.0f,
-                  0.0f,  sc,    0.0f,  0.0f,
-                  0.0f,  0.0f,  sc,    0.0f,
-                  0.0f,  0.0f,  0.0f,  1.0f;
+    if (!_use_csm) {
 
-    float ss = 0.30;
-    sphere_scale << ss,    0.0f,  0.0f,  0.0f,
-                    0.0f,  ss,    0.0f,  0.0f,
-                    0.0f,  0.0f,  ss,    0.0f,
-                    0.0f,  0.0f,  0.0f,  1.0f;
-
-    float st = 0.1;
-    tea_scale <<    st,    0.0f,  0.0f,  0.0f,
-                    0.0f,  st,    0.0f,  0.0f,
-                    0.0f,  0.0f,  st,    0.0f,
-                    0.0f,  0.0f,  0.0f,  1.0f;
-
-    float sw = .8;
-    wall_scale << 0.08,    0.0f,  0.0f,  0.0f,
-                  0.0f,  sw,    0.0f,  0.0f,
-                  0.0f,  0.0f,  2,    0.0f,
-                  0.0f,  0.0f,  0.0f,  1.0f;
-
-
-
-
-    // Transformations for the mesh models_matrixs
-    cube_trans = Eigen::Affine3f(Eigen::Translation3f(vec3(0.0f, 0.33f, 0.0f))).matrix();
-    sphere_trans = Eigen::Affine3f(Eigen::Translation3f(vec3(-0.8f, 1.0f, 0.3f))).matrix();
-    tea_trans = Eigen::Affine3f(Eigen::Translation3f(vec3(-0.6f, 0.00f, -0.5f))).matrix();
-    wall_trans = Eigen::Affine3f(Eigen::Translation3f(vec3(-1.0f, 0.0f, -1.0f))).matrix();
-
-    cube_model_matrix = cube_trans * cube_scale;
-    sphere_model_matrix = sphere_trans * sphere_scale;
-    tea_model_matrix = tea_trans * tea_scale;
-    wall_model_matrix = wall_trans * wall_scale;
+        cube_model_matrix = generateModelMatrix(cube_trans, cube_scale);
+        sphere_model_matrix = generateModelMatrix(sphere_trans, sphere_scale);
+        tea_model_matrix = generateModelMatrix(tea_trans, tea_scale);
+        wall_model_matrix = generateModelMatrix(wall_trans, wall_scale);
 
     } else {
     float scsm = 0.5;
@@ -619,9 +641,7 @@ void display() {
     check_error_gl();
 
 
-
-
-    if (!isCSM) {
+    if (!_use_csm) {
         wall.draw(wall_model_matrix, view * trackball_matrix, shadow_pid);
         tangle_cube.draw(cube_model_matrix, view * trackball_matrix, shadow_pid);
         sphere.draw(sphere_model_matrix, view * trackball_matrix, shadow_pid);
@@ -684,7 +704,7 @@ void display() {
 
 
 
-    if (!isCSM) {
+    if (!_use_csm) {
         wall.draw(wall_model_matrix, view * trackball_matrix, default_pid);
         tangle_cube.draw(cube_model_matrix, view * trackball_matrix, default_pid);
         sphere.draw(sphere_model_matrix, view * trackball_matrix, default_pid);
@@ -723,7 +743,7 @@ void mouse_button(int button, int action) {
         glfwGetMousePos(&x_i, &y_i);
         vec2 p = transform_screen_coords(x_i, y_i);
         trackball.begin_drag(p.x(), p.y());
-        if (isCSM){
+        if (_use_csm){
             old_trackball_matrix_CSM = trackball_matrix_CSM;  // Store the current state of the model matrix.
         } else {
             old_trackball_matrix = trackball_matrix;  // Store the current state of the model matrix.
@@ -739,7 +759,7 @@ void mouse_pos(int x, int y) {
     if (glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
         vec2 p = transform_screen_coords(x, y);
 
-        if (isCSM){
+        if (_use_csm){
             trackball_matrix_CSM = trackball.drag(p.x(), p.y()) * old_trackball_matrix_CSM;
         } else {
             trackball_matrix = trackball.drag(p.x(), p.y()) * old_trackball_matrix;
@@ -751,7 +771,7 @@ void mouse_pos(int x, int y) {
         mat4 zRot = mat4::Identity();
         zRot(2, 3) = (y - savedYMousePos) / 50.0f;
 
-        if (isCSM) {
+        if (_use_csm) {
             view_CSM = zRot * view_CSM;
         } else {
             view = zRot * view;

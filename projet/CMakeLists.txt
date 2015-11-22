@@ -6,8 +6,6 @@ add_executable(${DIR} ${SOURCES} ${HEADERS} ${SHADERS})
 target_link_libraries(${DIR} ${COMMON_LIBS})
 
 # Deploying shaders
-target_deploy_file(${DIR} _shadow_shaders/csm_vshader.glsl)
-target_deploy_file(${DIR} _shadow_shaders/csm_fshader.glsl)
 target_deploy_file(${DIR} _shadow_shaders/vsm_vshader.glsl)
 target_deploy_file(${DIR} _shadow_shaders/vsm_fshader.glsl)
 target_deploy_file(${DIR} _shadow_shaders/filter_vshader.glsl)

@@ -17,11 +17,8 @@ out vec3 n;
 out vec2 uv;
 out vec4 shadow_coord;
 out vec4 vpoint_MV;
-out vec3 vpoint2;
 
 void main() {
-
-    vpoint2 = vpoint;
     n = mat3(model) * vnormal;
 
     if (has_normal) {
