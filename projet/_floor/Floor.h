@@ -13,14 +13,14 @@ protected:
 
 public:
     void init(){
-        float s = 4.0;
+        float s = 8.0;
         mat4 scale;
         scale << s,    0.0f,  0.0f,  0.0f,
                       0.0f,  s,    0.0f,  0.0f,
                       0.0f,  0.0f,  s,    0.0f,
                       0.0f,  0.0f,  0.0f,  1.0f;
 
-        mat4 trans = Eigen::Affine3f(Eigen::Translation3f(vec3(0.0f, 0.0f, 0.0f))).matrix();
+        mat4 trans = Eigen::Affine3f(Eigen::Translation3f(vec3(-1.0f, 0.0f, -1.0f))).matrix();
 
         bigModel = trans * scale;
         ///--- Vertex one vertex Array

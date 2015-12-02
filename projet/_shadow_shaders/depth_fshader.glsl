@@ -10,8 +10,4 @@ void main() {
     float distanceToLight = 1.0;
 
     color = vec3(shadow_coord.z / shadow_coord.w);
-//    if (distanceToLight > 1) {
-//        color = vec3(1.0, 0.0, 0.0);
-//    }
-//        color = vec3(distanceToLight);
 }

@@ -4,7 +4,6 @@ uniform mat4 view;
 uniform mat4 model;
 uniform mat4 depth_vp_offset;
 
-uniform sampler2D normalTex;
 uniform float texRatio;
 uniform bool has_normal;
 
@@ -19,12 +18,8 @@ out vec4 shadow_coord;
 out vec4 vpoint_MV;
 
 void main() {
-    n = mat3(model) * vnormal;
-
-    if (has_normal) {
-        n = mat3(model) * texture2D(normalTex, (uv*texRatio)).rgb;
-        n = vec3(n.g, n.r, n.b);
-    }
+    // Inverse transpose
+    n = (inverse(transpose(model)) * vec4(vnormal,0.0)).xyz;
 
     vec4 shadow_pos = vec4(vpoint,1.0);
 
@@ -41,5 +36,6 @@ void main() {
     vpoint_MV = vpoint_mv;
 
     gl_Position = projection * vpoint_mv;
+
     uv = vtexcoord;
 }

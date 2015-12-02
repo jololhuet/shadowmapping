@@ -20,7 +20,7 @@ out vec4 vpoint_MV;
 
 void main() {
 
-    n = mat3(model) * vnormal;
+    n = (inverse(transpose(model)) * vec4(vnormal,0.0)).xyz;
 
     if (has_normal) {
         n = mat3(model) * texture2D(normalTex, (uv*texRatio)).rgb;
@@ -43,5 +43,6 @@ void main() {
     vpoint_MV = vpoint_mv;
 
     gl_Position = projection * vpoint_mv;
+
     uv = vtexcoord;
 }

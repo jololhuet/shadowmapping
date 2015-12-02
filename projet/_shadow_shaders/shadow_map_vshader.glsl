@@ -4,7 +4,6 @@ uniform mat4 depth_vp;
 uniform mat4 depth_vp_offset;
 uniform mat4 model;
 uniform mat4 view;
-uniform mat4 projection;
 
 in vec3 vnormal;
 in vec3 vpoint;

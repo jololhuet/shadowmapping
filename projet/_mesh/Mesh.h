@@ -85,9 +85,8 @@ public:
         glDrawElements(GL_TRIANGLES, 3 * _mesh.n_faces(), GL_UNSIGNED_INT, ZERO_BUFFER_OFFSET);
     }
 
-    void getVertices (std::list<std::vector<float> >& mesh_points/*, mat4& model*/) {
+    void getVertices (std::list<std::vector<float> >& mesh_points, mat4& model) {
         Surface_mesh::Vertex_iterator vit;
-        mat4 model = mat4::Identity();
         for (vit = _mesh.vertices_begin(); vit != _mesh.vertices_end(); ++vit)
         {
             vec3 vp = vpoint[*vit];
