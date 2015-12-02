@@ -10,7 +10,6 @@
 
 class ShadowBuffer{
 protected:
-    bool isVsm = false;
     bool _init;
     int _width;
     int _height;
@@ -107,17 +106,5 @@ public:
         glDeleteFramebuffers(1, &_fbo);
         glDeleteTextures(1, &_depthVSM_tex);
         glDeleteTextures(1, &_depth_tex);
-    }
-
-    int getVsmTex () {
-        return _depthVSM_tex;
-    }
-
-    void setVsm (bool vsm) {
-        isVsm = vsm;
-    }
-
-    bool getIsVsm () {
-        return isVsm;
     }
 };

@@ -450,6 +450,7 @@ void TW_CALL NormalOffsetGet (void *value, void *clientData)
 // MINIBALL stuff
 // Compute the 8 corner points of the current view frustum
 void computePoints (Frustum& f, vec3 cam_pos, vec3 view_dir) {
+    cout << "ComputePoints" << endl;
     vec3 up = vec3(0.0, 1.0, 0.0);
     vec3 right = view_dir.cross(up);
 
@@ -480,6 +481,7 @@ void computePoints (Frustum& f, vec3 cam_pos, vec3 view_dir) {
 }
 
 mat4 buildBox(Frustum& f) {
+    cout << "BuildBox" << endl;
     mat4 light_view = lookAt(light_dir, vec3(0.0,0.0,0.0), vec3(0,1,0));
     mat4 light_model = mat4::Identity();
     mat4 light_mv = light_view * light_model;
@@ -545,7 +547,7 @@ mat4 buildBox(Frustum& f) {
 // Split the frustum into cur_num_splits smaller frustums
 int cur_num_splits = 1;
 void splitFrustum (bool bigScene = false)  {
-
+    cout << "SplitFrustum" << endl;
     vec3 cameraPosition;
     float lambda = 0.8;
     fs[0].near = camera_near;
@@ -609,6 +611,7 @@ mat4 cone_model_matrix3;
 mat4 csm_model_matrix;
 
 void init() {
+    cout << "Initialisation" << endl;
     // Light properties
     light_dir = vec3(-5.0, 10.0, 5.0);
     light_pos = vec3(light_dir);
@@ -833,7 +836,7 @@ void display() {
     // Check if we are using vsm shaders
     bool is_vsm = (default_pid == vsm_pid);
 
-    if (buffer_size != prev_buffer_size || is_vsm != sb[0].getIsVsm()) {
+    if (buffer_size != prev_buffer_size) {
         sb[0].setSize(buffer_size, buffer_size);
         vec2 texs = sb[0].init();
         depth_tex[0] = texs[0];
@@ -890,8 +893,6 @@ void display() {
         csm_scene.draw(csm_model_matrix, view_CSM*trackball_matrix_CSM, shadow_pid);
         ground_floor.draw(view_CSM * trackball_matrix_CSM, shadow_pid);
     }
-
-
     sb[i].unbind();
     //=== UNBIND
 
@@ -957,7 +958,6 @@ void display() {
         ground_floor.setSize(1);
         ground_floor.draw(view_CSM * trackball_matrix_CSM, default_pid);
     }
-
 
     glIsQuery(0);
 
