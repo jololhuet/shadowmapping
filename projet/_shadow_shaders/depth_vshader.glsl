@@ -2,9 +2,6 @@
 uniform mat4 view;
 uniform mat4 model;
 
-uniform mat4 light_projection;
-uniform mat4 light_view;
-
 uniform int light_type;
 
 uniform mat4 depth_vp;

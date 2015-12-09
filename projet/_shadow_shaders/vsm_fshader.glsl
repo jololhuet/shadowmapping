@@ -12,7 +12,6 @@ uniform int light_type;
 uniform float pcfSpread;
 uniform float nIter = 16.0;
 
-
 // For texturing
 uniform sampler2D tex;
 in vec2 uv;

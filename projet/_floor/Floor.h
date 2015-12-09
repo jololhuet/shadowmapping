@@ -130,8 +130,6 @@ public:
         glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, _texNormal);
 
-
-
         float texRatio = 6.0;
 
         glUniform1i(glGetUniformLocation(pid, "tex"), 4 /*GL_TEXTURE4*/);

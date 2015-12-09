@@ -2,7 +2,6 @@
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-uniform mat4 depth_vp;
 uniform mat4 depth_vp_offset;
 
 uniform sampler2D normalTex;
