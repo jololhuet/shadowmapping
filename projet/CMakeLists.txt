@@ -16,6 +16,8 @@ target_deploy_file(${DIR} _shadow_shaders/bias_vshader.glsl)
 target_deploy_file(${DIR} _shadow_shaders/bias_fshader.glsl)
 target_deploy_file(${DIR} _shadow_shaders/depth_vshader.glsl)
 target_deploy_file(${DIR} _shadow_shaders/depth_fshader.glsl)
+target_deploy_file(${DIR} _shadow_shaders/point_fshader.glsl)
+target_deploy_file(${DIR} _shadow_shaders/point_vshader.glsl)
 
 
 # Deploying textures

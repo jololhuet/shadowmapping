@@ -22,7 +22,10 @@ uniform vec3 mesh_color;
 uniform vec3 light_d;
 uniform vec3 light_pos;
 
-uniform sampler2D vsm_shadow_map;
+uniform sampler2D vsm_shadow_map0;
+uniform sampler2D vsm_shadow_map1;
+uniform sampler2D vsm_shadow_map2;
+uniform sampler2D vsm_shadow_map3;
 
 in vec4 shadow_coord;
 in vec4 vpoint_MV;
@@ -49,7 +52,7 @@ vec4 blurTex2D(sampler2D map, vec2 uv_coord, float radius, int steps)
 float chebyshevUpperBound(vec4 coords, float minVar)
 {
     // We retrive the two moments previously stored (depth and depth*depth)
-    vec2 moments = blurTex2D(vsm_shadow_map,coords.xy/coords.w, blurRadius, blurSteps).xy;
+    vec2 moments = blurTex2D(vsm_shadow_map0, coords.xy/coords.w, blurRadius, blurSteps).xy;
 
     // Surface is fully lit. as the current fragment is before the light occluder
     if (coords.z/coords.w <= moments.x)

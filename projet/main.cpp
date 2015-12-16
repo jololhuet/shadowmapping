@@ -5,6 +5,7 @@
 #include "_floor/Floor.h"
 #include "_mesh/Mesh.h"
 #include "Miniball.hpp"
+#include "point.h"
 
 /**
  *  Precision, the code implemented here come from multiple differents tutorial and courses.
@@ -33,9 +34,12 @@ struct Frustum
     mat4 shadProj;
 };
 
-#define MAX_SPLITS 4
+#define MAX_SPLITS 8
 Frustum fs [MAX_SPLITS];
 ShadowBuffer sb[MAX_SPLITS];  // FBO for shadow map generation
+
+//int width = 1536;
+//int height = 1024;
 
 int width = 1024;
 int height = 768;
@@ -85,8 +89,6 @@ bool _light_type = 0;
 vec3 light_dir;  // Direction towards the light
 vec3 light_pos;
 mat4 light_projection;  // Projection matrix for light source
-mat4 light_projection_orthogonal;
-mat4 light_projection_perspective;
 mat4 light_view;
 
 mat4 offset_matrix;  // Affine transformation to map components from [-1, 1] to [0, 1], defined in init()
@@ -219,7 +221,7 @@ mat4 createLightProjection (vec3 center, float radius, bool isOrtho){
         lightPosition = light_pos;
     }
 
-    float error = radius / 4.0;
+    float error = radius / 2.0;
 
     vec3 diff = center - lightPosition;
     float distance = sqrt(diff.dot(diff));
@@ -228,9 +230,7 @@ mat4 createLightProjection (vec3 center, float radius, bool isOrtho){
     float far = distance + radius +error;
 
     if (isOrtho) {
-        float mult = 1.4f;
-//        cout << "near : " << near << endl;
-//        cout << "far : " << far << endl;
+        float mult = 2.0f;
         return OrthographicProjection(-mult*radius, mult*radius, -mult*radius, mult*radius, mult*near, mult*far);
     } else {
         float aspect = (float)width/(float)height;
@@ -243,7 +243,6 @@ mat4 createLightProjection (vec3 center, float radius, bool isOrtho){
         return PerspectiveProjection(_light_fovy, _light_aspect, _light_near_pane, _light_far_pane);
     }
 }
-
 
 float camera_near = 0.1f;
 float camera_far = 1000.0f;
@@ -258,7 +257,7 @@ void keyboard(int key, int action){
         radius = lightRadiusSmallScene;
     }
      switch (key) {
-            /// 'W' 'A' 'S' and 'D' are use to move the camera around the scene
+        /// 'W' 'A' 'S' and 'D' are use to move the camera around the scene
         case 'W':
             keyboardState.isWPressed = !keyboardState.isWPressed;
             break;
@@ -279,6 +278,7 @@ void keyboard(int key, int action){
         case 'O':
             if(action != GLFW_RELEASE) return;
             light_projection = createLightProjection(center, radius, true);
+            light_view = lookAt(vec3(0,0,0), vec3(-light_dir), vec3(0,1,0));
             _light_type = 0;
             bias = 0.005;
             std::cout<<"Directional Light"<<std::endl<<std::flush;
@@ -286,14 +286,19 @@ void keyboard(int key, int action){
 
         case 'P':
             if(action != GLFW_RELEASE) return;
-            light_projection = createLightProjection(center, radius, false);
-            _light_type = 1;
-            if (default_pid != vsm_pid) {
-                bias = 0.10;
+            if (_use_csm) {
+                cout << "Can't use spot light in Cascaded shadow mode " << endl;
             } else {
-                bias = 0.05;
+                light_projection = createLightProjection(center, radius, false);
+                light_view = lookAt(light_pos, vec3(0,0,0), vec3(0,1,0));
+                _light_type = 1;
+                if (default_pid != vsm_pid) {
+                    bias = 0.10;
+                } else {
+                    bias = 0.05;
+                }
+                std::cout<<"Spot Light"<<std::endl<<std::flush;
             }
-            std::cout<<"Spot Light"<<std::endl<<std::flush;
             break;
 
             /// 'I', 'J', 'K' and 'L' used to move the light source point.
@@ -334,10 +339,21 @@ void keyboard(int key, int action){
             light_projection = createLightProjection(center, radius, _light_type == 0);
             break;
 
+//        case 'Y':
+//            if (_use_csm) {
+
+//            }
+//            break;
+
+//        case 'X':
+//            if (_use_csm) {
+
+//            }
+//            break;
+
         case '0':
             if(action != GLFW_RELEASE) return;
             default_pid = depth_pid;
-//            _use_csm = false;
             std::cout<<"Mode DEPTH PRINT"<<std::endl<<std::flush;
             break;
 
@@ -378,6 +394,13 @@ void keyboard(int key, int action){
         case '4':
             if(action != GLFW_RELEASE) return;
             _use_csm = !_use_csm;
+            _light_type = 0;
+            for (int i = 0; i < 2; i++) {
+                sb[i].setSize(buffer_size, buffer_size);
+                vec2 texs = sb[i].init(i);
+                depth_tex[i] = texs[0];
+                depthVSM_tex[i] = texs[1];
+            }
             if (_use_csm) {
                 std::cout<<"Mode CSM"<<std::endl<<std::flush;
             } else {
@@ -392,15 +415,9 @@ void keyboard(int key, int action){
             if (_use_big_scene) {
                 std::cout<<"Large Scene"<<std::endl<<std::flush;
                 light_projection = createLightProjection(lightCenterLargeScene, lightRadiusLargeScene, _light_type == 0);
-                camera_near = 1.5*lightRadiusLargeScene;
-                camera_far = 4.5*lightRadiusLargeScene;
-                projection = PerspectiveProjection(45.0f, (GLfloat)width/height, camera_near, camera_far);
             } else {
                 std::cout<<"Normal scene"<<std::endl<<std::flush;
                 light_projection = createLightProjection(lightCenterSmallScene, lightRadiusSmallScene, _light_type == 0);
-                camera_near = 1.5*lightRadiusSmallScene;
-                camera_far = 4.5*lightRadiusSmallScene;
-                projection = PerspectiveProjection(45.0f, (GLfloat)width/height, camera_near, camera_far);
             }
             break;
 
@@ -464,46 +481,41 @@ void TW_CALL NormalOffsetGet (void *value, void *clientData)
     *(bool *)value = use_normal_offset;  // for instance
 }
 
-// Compute the 8 corner points of the current view frustum
-void updateFrustumPoints (Frustum& f, vec3 cam_pos, vec3 view_dir) {
-    vec3 up = vec3(0.0, 1.0, 0.0);
-    vec3 right = view_dir.cross(up);
+// Compute the 8 corner points of the current view frustum -- 'Should find a better way ?'
+void updateFrustumPoints (Frustum& f, mat4 projection, mat4 view) {
+    mat4 cam_vp = projection * view;
+    mat4 cam_vp2 = cam_vp.inverse();
 
-    vec3 fc = cam_pos + view_dir*f.far;
-    vec3 nc = cam_pos + view_dir*f.near;
-
-    right = right.normalized();
-    up = right.cross(view_dir);
-    up = up.normalized();
-
-    // these heights and widths are half the heights and widths of
-    // the near and far plane rectangles
-    float near_height = tan(f.fovy/2.0f) * f.near;
-    float near_width = near_height * f.aspect;
-    float far_height = tan(f.fovy/2.0f) * f.far;
-    float far_width = far_height * f.aspect;
-
-    f.points[0] = nc - up*near_height - right*near_width;
-    f.points[1] = nc + up*near_height - right*near_width;
-    f.points[2] = nc + up*near_height + right*near_width;
-    f.points[3] = nc - up*near_height + right*near_width;
-
-    f.points[4] = fc - up*far_height - right*far_width;
-    f.points[5] = fc + up*far_height - right*far_width;
-    f.points[6] = fc + up*far_height + right*far_width;
-    f.points[7] = fc - up*far_height + right*far_width;
-
+    vec4 p = cam_vp2 * vec4(-1, -1, -1, 1);
+    f.points[0] = vec3(p.x(), p.y(), p.z()) / p.w();
+    p = cam_vp2 * vec4(-1, -1, 1, 1);
+    f.points[1] = vec3(p.x(), p.y(), p.z())/ p.w();
+    p = cam_vp2 * vec4(-1, 1, -1, 1);
+    f.points[2] = vec3(p.x(), p.y(), p.z())/ p.w();
+    p = cam_vp2 * vec4(-1, 1, 1, 1);
+    f.points[3] = vec3(p.x(), p.y(), p.z())/ p.w();
+    p = cam_vp2 * vec4(1, -1, -1, 1);
+    f.points[4] = vec3(p.x(), p.y(), p.z())/ p.w();
+    p = cam_vp2 * vec4(1, -1, 1, 1);
+    f.points[5] = vec3(p.x(), p.y(), p.z())/ p.w();
+    p = cam_vp2 * vec4(1, 1, -1, 1);
+    f.points[6] = vec3(p.x(), p.y(), p.z())/ p.w();
+    p = cam_vp2 * vec4(1, 1, 1, 1);
+    f.points[7] = vec3(p.x(), p.y(), p.z())/ p.w();
 }
 
 // Split the frustum into cur_num_splits smaller frustums
-int cur_num_splits = 1;
-void updateSplitDist ()  {
+GLfloat far_planes[MAX_SPLITS];
+int cur_num_splits = 2;
+void updateSplitDist () {
     float near = camera_near;
     float far = camera_far;
 
     float lambda = 0.75f;
     float ratio = far/near;
     fs[0].near = near;
+    fs[0].fovy = 45.0f;
+    fs[0].aspect = (float)width/height;
 
     for(int i=1; i<cur_num_splits; i++)
     {
@@ -511,144 +523,120 @@ void updateSplitDist ()  {
 
         fs[i].near = lambda*(near*pow(ratio, si)) + (1-lambda)*(near + (far - near)*si);
         fs[i-1].far = fs[i].near * 1.005f;
+        fs[i].aspect = (float)width/height;
+        fs[i].fovy = 45.0f;
+
+        far_planes[i-1] = fs[i-1].far;
     }
     fs[cur_num_splits-1].far = far;
+    far_planes[cur_num_splits-1] = far;
 }
 
 mat4 applyCropMatrix (Frustum& f, mat4 light_mv) {
-    float minX = 1000;
-    float maxX = -1000;
-    float minY = 1000;
-    float maxY = -1000;
-    float minZ;
-    float maxZ;
+    float minX = FLT_MAX;
+    float maxX = -FLT_MAX;
+    float minY = FLT_MAX;
+    float maxY = -FLT_MAX;
+    float minZ = FLT_MAX;
+    float maxZ = -FLT_MAX;
 
-    vec4 transf = light_mv * vec4(f.points[0].x(), f.points[0].y(), f.points[0].z(), 1.0f);
-    minZ = transf.z()/transf.w();
-    maxZ = transf.z()/transf.w();
+    vec4 transf;
 
     for (int i = 0; i < 8; i++) {
         transf = light_mv * vec4(f.points[i].x(), f.points[i].y(), f.points[i].z(), 1.0f);
+//        cout << "Point " << i << " : " << endl;
+//        cout << f.points[i].x() << " ; " << f.points[i].y() << " ; " << f.points[i].z() << endl;
+
         if (transf.z() < minZ) minZ = transf.z();
         if (transf.z() > maxZ) maxZ = transf.z();
+        if (transf.x() > maxX) maxX = transf.x();
+        if (transf.x() < minX) minX = transf.x();
+        if (transf.y() > maxY) maxY = transf.y();
+        if (transf.y() < minY) minY = transf.y();
     }
 
-    mat4 projection = OrthographicProjection(-1.0, 1.0, -1.0, 1.0, -maxZ, -minZ);
+//    cout << "left : " << minX << " & right : " << maxX << endl;
+//    cout << "bot : " << minY << " & top : " << maxY << endl;
+//    cout << "near : " << -maxZ << " & far : " << -minZ << endl;
 
-    mat4 light_mvp = projection * light_mv;
+    mat4 light_proj = OrthographicProjection(minX, maxX, minY, maxY, -maxZ, -minZ);
 
-    for(int i=0; i<8; i++)
-    {
-        transf = light_mvp*vec4(f.points[i].x(), f.points[i].y(), f.points[i].z(), 1.0f);
-
-        transf.x() /= transf.w();
-        transf.y() /= transf.w();
-
-        if(transf.x() > maxX) maxX = transf.x();
-        if(transf.x() < minX) minX = transf.x();
-        if(transf.y() > maxY) maxY = transf.y();
-        if(transf.y() < minY) minY = transf.y();
-    }
-
-//    cout << "Min : " << minZ << " ; Max : " << maxZ << endl;
-
-    float scaleX = 2.0f/(maxX - minX);
-    float scaleY = 2.0f/(maxY - minY);
-    float offsetX = -0.5f*(maxX + minX)*scaleX;
-    float offsetY = -0.5f*(maxY + minY)*scaleY;
-
-    light_mvp = mat4::Identity();
-    light_mvp(0,0) = scaleX;
-    light_mvp(1,1) = scaleY;
-    light_mvp(0,3) = offsetX;
-    light_mvp(1,3) = offsetY;
-//    cout << light_mvp << endl;
-//    cout << "-----------------------------------------" << endl;
-
-    projection = light_mvp.transpose() * projection;
-
-    return projection;
+    return light_proj;
 }
 
-void drawDebugCube (GLfloat _pid, mat4& projection, mat4& view) {
-    glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-    debug_cube.draw(projection, view, _pid);
-    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+void drawDebugCube (GLfloat _pid, mat4 model, mat4 view) {
+//    glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+    debug_cube.draw(model, view, _pid);
+//    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 }
 
 mat4 all_mvp[MAX_SPLITS];
-mat4 makeShadowMap (bool bigScene = false, bool _use_csm = false) {
-
+mat4 makeShadowMap (bool bigScene, bool _use_csm) {
     mat4 viewMat;
+    mat4 trackball;
     vec3 center;
     float radius;
 
-    mat4 light_mv = lookAt(vec3(0.0,0.0,0.0), vec3(-light_dir), vec3(-1.0f,0,0));
     mat4 depth_vp;
 
     if (!bigScene) {
         viewMat = view;
+        trackball = trackball_matrix;
         center = lightCenterSmallScene;
         radius = lightRadiusSmallScene;
     } else {
         viewMat = view_big_scene;
+        trackball = trackball_matrix_big_scene;
         center = lightCenterLargeScene;
         radius = lightRadiusLargeScene;
     }
 
-    vec3 cameraPosition = vec3(viewMat.col(3).x(), viewMat.col(3).y(), viewMat.col(3).z());
-    vec3 view_dir = vec3(cameraPosition.normalized());
-
-    // compute the z-distances for each split as seen in camera space
-    updateSplitDist();
-
+    glUseProgram(shadow_pid);
     if (_use_csm) {
         for (int i = 0; i < cur_num_splits; i++) {
             sb[i].bind();
-                glActiveTexture(GL_TEXTURE0);
+                glActiveTexture(GL_TEXTURE0+20+i);
                 glBindTexture(GL_TEXTURE_2D, depthVSM_tex[i]);
                 check_error_gl();
 
                 glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
                 glViewport(0,0,buffer_size,buffer_size);
 
-                // compute the camera frustum slice boundary points in world space
-                updateFrustumPoints(fs[i], cameraPosition, view_dir);
+                mat4 projection_i = PerspectiveProjection(fs[i].fovy, fs[i].aspect, fs[i].near, fs[i].far);
 
-                fs[i].shadProj = applyCropMatrix(fs[i], light_mv);
-    //            cout << fs[i].shadProj << endl;
-    //            cout << "-----------------------------------------" << endl;
+                // compute the camera frustum slice boundary points in world space
+                updateFrustumPoints(fs[i], viewMat, projection_i);
+
+                fs[i].shadProj = applyCropMatrix(fs[i], light_view);
 
                 light_projection = fs[i].shadProj;
-                light_view = light_mv;
 
                 depth_vp = light_projection * light_view;
                 glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
 
                 // Draw the scene !
-                drawScene(_use_csm, shadow_pid);
-//                drawDebugCube(shadow_pid, light_projection, light_view);
+                drawScene(_use_big_scene, shadow_pid);
 
                 // We store the mvp matrices for each frustum for after
-                all_mvp[i] = fs[i].shadProj * light_mv;
+                all_mvp[i] = fs[i].shadProj * light_view;
             sb[i].unbind();
         }
     } else {
+
         light_projection = createLightProjection(center, radius, _light_type == 0);
+
         sb[0].bind();
-            glActiveTexture(GL_TEXTURE0);
+            glActiveTexture(GL_TEXTURE0+20);
             glBindTexture(GL_TEXTURE_2D, depthVSM_tex[0]);
             check_error_gl();
 
             glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
             glViewport(0,0,buffer_size,buffer_size);
 
-            light_view = light_mv;
             depth_vp = light_projection * light_view;
             glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
 
-            drawScene(_use_csm, shadow_pid);
-//            drawDebugCube(shadow_pid, light_projection, light_view);
+            drawScene(_use_big_scene, shadow_pid);
         sb[0].unbind();
     }
 
@@ -669,7 +657,7 @@ mat4 createScaleMatrix(float s1, float s2, float s3) {
     return scale;
 }
 
-mat4 generateModelMatrix (mat4& trans, mat4& scale) {
+mat4 generateModelMatrix (mat4 trans, mat4 scale) {
     return trans * scale;
 }
 
@@ -683,12 +671,10 @@ mat4 cone_model_matrix2;
 mat4 cone_model_matrix3;
 
 mat4 csm_model_matrix;
-
 void init() {
-    cout << "Initialisation" << endl;
     // Light properties
-    light_dir = vec3(-5.0, 10.0, 5.0);
-    light_pos = vec3(light_dir);
+    light_pos = vec3(10.0, 20.0, 0.0);
+    light_dir = light_pos;
     light_dir.normalize();
 
 
@@ -753,7 +739,6 @@ void init() {
     }
 
     glViewport(0,0,width,height);
-
     ground_floor.init();
 
     // Default scene
@@ -807,8 +792,6 @@ void init() {
         vec3 cameraPosition = center + vec3(0.0f, ball_radius, 3.0f*ball_radius);
 
         // Setting the projection matrix such that the whole scene is centered
-        camera_near = 1.5*ball_radius;
-        camera_far = 4.5*ball_radius;
         projection = PerspectiveProjection(45.0f, (GLfloat)width/height, camera_near, camera_far);
 
         view = lookAt(cameraPosition, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
@@ -846,29 +829,43 @@ void init() {
         lightRadiusLargeScene = ball_radius;
     }
 
-    light_projection_orthogonal = createLightProjection(lightCenterSmallScene, lightRadiusSmallScene, true);
-    light_projection_perspective = createLightProjection(lightCenterSmallScene, lightRadiusSmallScene, false);
-
-    light_projection = light_projection_orthogonal;
-
     check_error_gl();
+
 
     default_pid = depth_pid;
     glUseProgram(default_pid);
-    glUniform1i(glGetUniformLocation(default_pid, "shadow_map"), 1/*GL_TEXTURE1*/);
+    for (int i = 0; i < MAX_SPLITS; i++) {
+        string sdm = "shadow_map" + to_string(i);
+        const GLchar *shadowmap = sdm.c_str();
+        glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
+    }
 
     default_pid = filter_pid;
     glUseProgram(default_pid);
-    glUniform1i(glGetUniformLocation(default_pid, "shadow_map"), 1/*GL_TEXTURE1*/);
+    for (int i = 0; i < MAX_SPLITS; i++) {
+        string sdm = "shadow_map" + to_string(i);
+        const GLchar *shadowmap = sdm.c_str();
+        glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
+    }
 
     default_pid = bias_pid;
     glUseProgram(default_pid);
-    glUniform1i(glGetUniformLocation(default_pid, "shadow_map"), 1/*GL_TEXTURE1*/);
+    for (int i = 0; i < MAX_SPLITS; i++) {
+        string sdm = "shadow_map" + to_string(i);
+        const GLchar *shadowmap = sdm.c_str();
+        glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
+    }
 
     default_pid = vsm_pid;
     glUseProgram(default_pid);
-    glUniform1i(glGetUniformLocation(default_pid, "shadow_map"), 1/*GL_TEXTURE1*/);
-    glUniform1i(glGetUniformLocation(default_pid, "vsm_shadow_map"), 0 /*GL_TEXTURE0*/);
+    for (int i = 0; i < MAX_SPLITS; i++) {
+        string sdm = "shadow_map" + to_string(i);
+        const GLchar *shadowmap = sdm.c_str();
+        glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
+        string vsmsdm = "vsm_shadow_map" + to_string(i);
+        const GLchar *vsmshadowmap = vsmsdm.c_str();
+        glUniform1i(glGetUniformLocation(default_pid, vsmshadowmap), 20+i /*GL_TEXTURE0*/);
+    }
 
     trackball_matrix = mat4::Identity();
     trackball_matrix_big_scene = mat4::Identity();
@@ -883,13 +880,16 @@ void init() {
 
     for (int i = 0; i < cur_num_splits; i++) {
         sb[i].setSize(buffer_size, buffer_size);
-        vec2 texs = sb[i].init();
+        vec2 texs = sb[i].init(i);
         depth_tex[i] = texs[0];
         depthVSM_tex[i] = texs[1];
     }
     prev_buffer_size = buffer_size;
 
     check_error_gl();
+
+    // compute the z-distances for each split as seen in camera space
+    updateSplitDist();
 
 }
 
@@ -912,10 +912,7 @@ void drawScene (bool _use_big_scene, GLuint _pid) {
     }
 }
 
-bool first = true;
 void display() {
-    if (first) {
-//    first = false;
     check_error_gl();
 
     opengp::update_title_fps("Shadow Mapping");
@@ -933,7 +930,7 @@ void display() {
         prev_buffer_size = buffer_size;
         for (int i = 0; i < cur_num_splits; i++) {
             sb[i].setSize(buffer_size, buffer_size);
-            vec2 texs = sb[i].init();
+            vec2 texs = sb[i].init(i);
             depth_tex[i] = texs[0];
             depthVSM_tex[i] = texs[1];
         }
@@ -942,8 +939,7 @@ void display() {
     check_error_gl();
 
     if (_light_type == 0) {
-        vec3 ortho_light_pos = light_dir;
-        light_view = Eigen::lookAt(vec3(0,0,0), vec3(-ortho_light_pos), vec3(0,1,0));
+        light_view = Eigen::lookAt(vec3(0,0,0), vec3(-light_dir), vec3(0,1,0));
     } else {
         light_view = Eigen::lookAt(light_pos,vec3(0,0,0),vec3(0,1,0));
         if (old_near != _light_near_pane || old_far != _light_far_pane || old_fovy != _light_fovy || old_aspect != _light_aspect) {
@@ -972,7 +968,6 @@ void display() {
 
     check_error_gl();
 
-
     // Set matrix to transform from world space into NDC and then into [0, 1] ranges.
     mat4 depth_vp_offset = offset_matrix * depth_vp;
 
@@ -980,7 +975,9 @@ void display() {
     glUniformMatrix4fv(glGetUniformLocation(default_pid, "depth_vp_offset"), 1, GL_FALSE, depth_vp_offset.data());
 
     glUniform1f(glGetUniformLocation(default_pid, "bias"), bias);
+
     glUniform1i(glGetUniformLocation(default_pid, "useCsm"), _use_csm);
+    glUniform1fv(glGetUniformLocation(default_pid, "farPlane"), 8, far_planes);
 
     glUniform1i(glGetUniformLocation(default_pid, "usePolygonOffset"), use_polygon_offset);
     glUniform1i(glGetUniformLocation(default_pid, "useNormalOffset"), use_normal_offset);
@@ -1005,6 +1002,18 @@ void display() {
         glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
+//    mat4 vp = fs[0].shadProj * light_view;
+//    mat4 vp_inv = vp.inverse();
+
+//    drawDebugCube(default_pid, vp_inv, view);
+
+//    mat4 vp2 = fs[1].shadProj * light_view;
+//    mat4 vp_inv2 = vp2.inverse();
+
+//    drawDebugCube(default_pid, vp_inv2, view);
+
+    check_error_gl();
+
     drawScene(_use_big_scene, default_pid);
 
     glIsQuery(0);
@@ -1014,7 +1023,7 @@ void display() {
 #ifdef WITH_ANTTWEAKBAR
     TwDraw();
 #endif
-    }
+//    }
 }
 
 /// Trackball things
@@ -1093,7 +1102,6 @@ void GLFWCALL OnMouseButton (int button, int action) {
     }
 }
 
-
 int main(int, char**) {
     glfwInitWindowSize(width, height);
     glfwCreateWindow("Shadow Mapping");
@@ -1110,5 +1118,5 @@ int main(int, char**) {
     TwTerminate();
 #endif
 
-    return EXIT_SUCCESS;    
+    return EXIT_SUCCESS;
 }

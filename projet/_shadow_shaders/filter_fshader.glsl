@@ -26,7 +26,11 @@ uniform vec3 light_pos;
 uniform float bias;
 uniform bool usePolygonOffset;
 
-uniform sampler2D shadow_map;
+uniform sampler2D shadow_map0;
+uniform sampler2D shadow_map1;
+uniform sampler2D shadow_map2;
+uniform sampler2D shadow_map3;
+
 in vec4 shadow_coord;
 in vec4 vpoint_MV;
 
@@ -100,7 +104,7 @@ void main() {
 //        int index = int(16.0*randNumber(shadow_coord, i))%16; // Will change with the camera moving
         vec2 rotatedOffset = vec2(poisson_disk[index].x * s, poisson_disk[index].y * c);
 
-        if (texture2D(shadow_map, (shadow_coord.xy/shadow_coord.w + rotatedOffset/spread)).r < (shadow_coord.z - usedBias)/shadow_coord.w) {
+        if (texture2D(shadow_map0, (shadow_coord.xy/shadow_coord.w + rotatedOffset/spread)).r < (shadow_coord.z - usedBias)/shadow_coord.w) {
             shadow -= (1.0/nIter);
         }
     }

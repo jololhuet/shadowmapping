@@ -43,10 +43,10 @@ public:
         this->_height = image_height;
     }
 
-    vec2 init() {
+    vec2 init(GLint i) {
         ///--- Create (depth, depth²) texture
         {
-            glActiveTexture(GL_TEXTURE0);
+            glActiveTexture(GL_TEXTURE0+20+i);
             glGenTextures(1, &_depthVSM_tex);
             glBindTexture(GL_TEXTURE_2D, _depthVSM_tex);
 
@@ -67,7 +67,7 @@ public:
 
         ///--- Create Depth texture
         {
-            glActiveTexture(GL_TEXTURE1);
+            glActiveTexture(GL_TEXTURE0+10+i);
             glGenTextures(1, &_depth_tex);
             glBindTexture(GL_TEXTURE_2D, _depth_tex);
 
