@@ -39,8 +39,11 @@ uniform sampler2D shadow_map7;
 
 uniform float farPlane[8];
 
+uniform bool showFrustSplit;
+
 in vec4 shadow_coord;
 in vec4 vpoint_MV;
+in float distToCamera;
 
 vec3 proceed (sampler2D shadow_map) {
     vec3 light_dir;
@@ -75,23 +78,55 @@ vec3 proceed (sampler2D shadow_map) {
 }
 
 void main() {
-    if (vpoint_MV.z < farPlane[0]) {
-        color = proceed(shadow_map0);
-    } else if (vpoint_MV.z < farPlane[1]) {
-        color = proceed(shadow_map1);
-    } else if (vpoint_MV.z < farPlane[2]) {
-        color = proceed(shadow_map2);
-    } else if (vpoint_MV.z < farPlane[3]) {
-        color = proceed(shadow_map3);
-    } else if (vpoint_MV.z < farPlane[4]) {
-        color = proceed(shadow_map4);
-    } else if (vpoint_MV.z < farPlane[5]) {
-        color = proceed(shadow_map5);
-    } else if (vpoint_MV.z < farPlane[6]) {
-        color = proceed(shadow_map6);
-    } else if (vpoint_MV.z < farPlane[7]) {
-        color = proceed(shadow_map7);
+    if (distToCamera < farPlane[0]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map0);
+        } else {
+            color = vec3(1, 0, 0);
+        }
+    } else if (distToCamera < farPlane[1]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map1);
+        } else {
+            color = vec3(0, 1, 0);
+        }
+    } else if (distToCamera < farPlane[2]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map2);
+        } else {
+            color = vec3(0, 0, 1);
+        }
+    } else if (distToCamera < farPlane[3]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map3);
+        } else {
+            color = vec3(1, 1, 0);
+        }
+    } else if (distToCamera < farPlane[4]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map4);
+        } else {
+            color = vec3(1, 0, 1);
+        }
+    } else if (distToCamera < farPlane[5]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map5);
+        } else {
+            color = vec3(0, 1, 1);
+        }
+    } else if (distToCamera < farPlane[6]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map6);
+        } else {
+            color = vec3(1, 0, 1);
+        }
+    } else if (distToCamera < farPlane[7]) {
+        if (!showFrustSplit){
+            color = proceed(shadow_map7);
+        } else {
+            color = vec3(1, 1, 0);
+        }
     } else {
-
+        vec3(0);
     }
 }

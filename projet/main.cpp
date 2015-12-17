@@ -22,7 +22,7 @@ TwBar *bar;
 #endif
 
 // Fonctions:
-void drawScene(bool _use_big_scene, GLuint _pid);
+void drawScene(bool _use_big_scene, GLuint _pid, mat4 view);
 
 struct Frustum
 {
@@ -230,7 +230,7 @@ mat4 createLightProjection (vec3 center, float radius, bool isOrtho){
     float far = distance + radius +error;
 
     if (isOrtho) {
-        float mult = 2.0f;
+        float mult = 1.0f;
         return OrthographicProjection(-mult*radius, mult*radius, -mult*radius, mult*radius, mult*near, mult*far);
     } else {
         float aspect = (float)width/(float)height;
@@ -244,8 +244,12 @@ mat4 createLightProjection (vec3 center, float radius, bool isOrtho){
     }
 }
 
+bool _show_frust_splits = false;
+int cur_num_splits = 2;
+int _currentDisplayedFrust = 0;
+bool _debugFrust = false;
 float camera_near = 0.1f;
-float camera_far = 1000.0f;
+float camera_far = 50.0f;
 void keyboard(int key, int action){
     vec3 center;
     float radius;
@@ -257,6 +261,20 @@ void keyboard(int key, int action){
         radius = lightRadiusSmallScene;
     }
      switch (key) {
+        case 'V':
+            if(action != GLFW_RELEASE) return;
+            _debugFrust = !_debugFrust;
+            cout << "Debug Frustum : " << _debugFrust << endl;
+            break;
+
+        case 'C':
+            if(action != GLFW_RELEASE) return;
+            _currentDisplayedFrust++;
+            _currentDisplayedFrust = _currentDisplayedFrust%cur_num_splits;
+            cout << "Display : " << _currentDisplayedFrust << endl;
+            cout << fs[_currentDisplayedFrust].near << " : " << fs[_currentDisplayedFrust].far << endl;
+            break;
+
         /// 'W' 'A' 'S' and 'D' are use to move the camera around the scene
         case 'W':
             keyboardState.isWPressed = !keyboardState.isWPressed;
@@ -338,18 +356,6 @@ void keyboard(int key, int action){
             else light_pos += vec3(0.0f,-0.3f,0.0f);
             light_projection = createLightProjection(center, radius, _light_type == 0);
             break;
-
-//        case 'Y':
-//            if (_use_csm) {
-
-//            }
-//            break;
-
-//        case 'X':
-//            if (_use_csm) {
-
-//            }
-//            break;
 
         case '0':
             if(action != GLFW_RELEASE) return;
@@ -480,6 +486,13 @@ void TW_CALL NormalOffsetGet (void *value, void *clientData)
 {
     *(bool *)value = use_normal_offset;  // for instance
 }
+void TW_CALL ShowFrustSplitSet (const void *value, void *clientData) {
+    _show_frust_splits = *(const bool *)value;
+}
+void TW_CALL ShowFrustSplitGet (void *value, void *clientData)
+{
+    *(bool *)value = _show_frust_splits;  // for instance
+}
 
 // Compute the 8 corner points of the current view frustum -- 'Should find a better way ?'
 void updateFrustumPoints (Frustum& f, mat4 projection, mat4 view) {
@@ -489,24 +502,31 @@ void updateFrustumPoints (Frustum& f, mat4 projection, mat4 view) {
     vec4 p = cam_vp2 * vec4(-1, -1, -1, 1);
     f.points[0] = vec3(p.x(), p.y(), p.z()) / p.w();
     p = cam_vp2 * vec4(-1, -1, 1, 1);
-    f.points[1] = vec3(p.x(), p.y(), p.z())/ p.w();
+//    cout << p.x() << " " << p.y() << " " << p.z() << endl;
+    f.points[1] = vec3(p.x(), p.y(), p.z()) / p.w();
     p = cam_vp2 * vec4(-1, 1, -1, 1);
-    f.points[2] = vec3(p.x(), p.y(), p.z())/ p.w();
+//    cout << p.x() << " " << p.y() << " " << p.z() << endl;
+    f.points[2] = vec3(p.x(), p.y(), p.z()) / p.w();
     p = cam_vp2 * vec4(-1, 1, 1, 1);
-    f.points[3] = vec3(p.x(), p.y(), p.z())/ p.w();
+//    cout << p.x() << " " << p.y() << " " << p.z() << endl;
+    f.points[3] = vec3(p.x(), p.y(), p.z()) / p.w();
     p = cam_vp2 * vec4(1, -1, -1, 1);
-    f.points[4] = vec3(p.x(), p.y(), p.z())/ p.w();
+//    cout << p.x() << " " << p.y() << " " << p.z() << endl;
+    f.points[4] = vec3(p.x(), p.y(), p.z()) / p.w();
     p = cam_vp2 * vec4(1, -1, 1, 1);
-    f.points[5] = vec3(p.x(), p.y(), p.z())/ p.w();
+//    cout << p.x() << " " << p.y() << " " << p.z() << endl;
+    f.points[5] = vec3(p.x(), p.y(), p.z()) / p.w();
     p = cam_vp2 * vec4(1, 1, -1, 1);
-    f.points[6] = vec3(p.x(), p.y(), p.z())/ p.w();
+//    cout << p.x() << " " << p.y() << " " << p.z() << endl;
+    f.points[6] = vec3(p.x(), p.y(), p.z()) / p.w();
     p = cam_vp2 * vec4(1, 1, 1, 1);
-    f.points[7] = vec3(p.x(), p.y(), p.z())/ p.w();
+//    cout << p.x() << " " << p.y() << " " << p.z() << endl;
+    f.points[7] = vec3(p.x(), p.y(), p.z()) / p.w();
+
 }
 
 // Split the frustum into cur_num_splits smaller frustums
 GLfloat far_planes[MAX_SPLITS];
-int cur_num_splits = 2;
 void updateSplitDist () {
     float near = camera_near;
     float far = camera_far;
@@ -555,9 +575,6 @@ mat4 applyCropMatrix (Frustum& f, mat4 light_mv) {
         if (transf.y() < minY) minY = transf.y();
     }
 
-//    cout << "left : " << minX << " & right : " << maxX << endl;
-//    cout << "bot : " << minY << " & top : " << maxY << endl;
-//    cout << "near : " << -maxZ << " & far : " << -minZ << endl;
 
     mat4 light_proj = OrthographicProjection(minX, maxX, minY, maxY, -maxZ, -minZ);
 
@@ -605,7 +622,7 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
                 mat4 projection_i = PerspectiveProjection(fs[i].fovy, fs[i].aspect, fs[i].near, fs[i].far);
 
                 // compute the camera frustum slice boundary points in world space
-                updateFrustumPoints(fs[i], viewMat, projection_i);
+                updateFrustumPoints(fs[i], projection_i, viewMat);
 
                 fs[i].shadProj = applyCropMatrix(fs[i], light_view);
 
@@ -615,10 +632,7 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
                 glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
 
                 // Draw the scene !
-                drawScene(_use_big_scene, shadow_pid);
-
-                // We store the mvp matrices for each frustum for after
-                all_mvp[i] = fs[i].shadProj * light_view;
+                drawScene(_use_big_scene, shadow_pid, view);
             sb[i].unbind();
         }
     } else {
@@ -636,7 +650,7 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
             depth_vp = light_projection * light_view;
             glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
 
-            drawScene(_use_big_scene, shadow_pid);
+            drawScene(_use_big_scene, shadow_pid, view);
         sb[0].unbind();
     }
 
@@ -704,6 +718,8 @@ void init() {
 
         TwAddVarRW(bar, "VSM Blur Radius", TW_TYPE_FLOAT, &vsmBlurRadius, " step=0.0005 ");
         TwAddVarRW(bar, "VSM Blur #Steps", TW_TYPE_INT16, &vsmBlurSteps, " step=1 ");
+
+        TwAddVarCB(bar, "Show Frust splits", TW_TYPE_BOOLCPP, ShowFrustSplitSet, ShowFrustSplitGet, NULL, NULL);
     }
 #endif
 
@@ -791,6 +807,8 @@ void init() {
 
         vec3 cameraPosition = center + vec3(0.0f, ball_radius, 3.0f*ball_radius);
 
+        camera_near = 0.1;
+        camera_far = 100.0;
         // Setting the projection matrix such that the whole scene is centered
         projection = PerspectiveProjection(45.0f, (GLfloat)width/height, camera_near, camera_far);
 
@@ -821,7 +839,7 @@ void init() {
         float ball_radius = sqrt(mb.squared_radius());
         vec3 center = vec3(mb.center());
 
-        vec3 cameraPosition = center + vec3(0.0f, ball_radius, 3.0f*ball_radius);
+        vec3 cameraPosition = center + vec3(0.0f, ball_radius/2.0f, ball_radius/2.0f);
 
         view_big_scene = lookAt(cameraPosition, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
 
@@ -890,11 +908,10 @@ void init() {
 
     // compute the z-distances for each split as seen in camera space
     updateSplitDist();
-
 }
 
 // Draw the scene:
-void drawScene (bool _use_big_scene, GLuint _pid) {
+void drawScene (bool _use_big_scene, GLuint _pid, mat4 view) {
     if (!_use_big_scene) {
         wall.draw(wall_model_matrix, view * trackball_matrix, _pid);
         tangle_cube.draw(cube_model_matrix, view * trackball_matrix, _pid);
@@ -977,7 +994,9 @@ void display() {
     glUniform1f(glGetUniformLocation(default_pid, "bias"), bias);
 
     glUniform1i(glGetUniformLocation(default_pid, "useCsm"), _use_csm);
+
     glUniform1fv(glGetUniformLocation(default_pid, "farPlane"), 8, far_planes);
+    glUniform1i(glGetUniformLocation(default_pid, "showFrustSplit"), _show_frust_splits);
 
     glUniform1i(glGetUniformLocation(default_pid, "usePolygonOffset"), use_polygon_offset);
     glUniform1i(glGetUniformLocation(default_pid, "useNormalOffset"), use_normal_offset);
@@ -1002,20 +1021,16 @@ void display() {
         glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
-//    mat4 vp = fs[0].shadProj * light_view;
-//    mat4 vp_inv = vp.inverse();
-
-//    drawDebugCube(default_pid, vp_inv, view);
-
-//    mat4 vp2 = fs[1].shadProj * light_view;
-//    mat4 vp_inv2 = vp2.inverse();
-
-//    drawDebugCube(default_pid, vp_inv2, view);
-
     check_error_gl();
 
-    drawScene(_use_big_scene, default_pid);
+    // Debug
+    if (_debugFrust) {
+        glUniformMatrix4fv(glGetUniformLocation(default_pid, "projection"), 1, GL_FALSE, fs[_currentDisplayedFrust].shadProj.data());
 
+        drawScene(_use_big_scene, default_pid, light_view);
+    } else {
+        drawScene(_use_big_scene, default_pid, view);
+    }
     glIsQuery(0);
 
     check_error_gl();
@@ -1023,7 +1038,6 @@ void display() {
 #ifdef WITH_ANTTWEAKBAR
     TwDraw();
 #endif
-//    }
 }
 
 /// Trackball things
