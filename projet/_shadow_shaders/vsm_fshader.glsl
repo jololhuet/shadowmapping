@@ -22,13 +22,22 @@ uniform vec3 mesh_color;
 uniform vec3 light_d;
 uniform vec3 light_pos;
 
+uniform bool useCsm;
+
 uniform sampler2D vsm_shadow_map0;
 uniform sampler2D vsm_shadow_map1;
 uniform sampler2D vsm_shadow_map2;
 uniform sampler2D vsm_shadow_map3;
+uniform sampler2D vsm_shadow_map4;
+uniform sampler2D vsm_shadow_map5;
+uniform sampler2D vsm_shadow_map6;
+uniform sampler2D vsm_shadow_map7;
+
+uniform float farPlane[8];
 
 in vec4 shadow_coord;
 in vec4 vpoint_MV;
+in float distToCamera;
 
 // Uniforms for blur
 uniform float blurRadius = 0.01;
@@ -49,10 +58,10 @@ vec4 blurTex2D(sampler2D map, vec2 uv_coord, float radius, int steps)
       return total / (steps * steps);
    }
 
-float chebyshevUpperBound(vec4 coords, float minVar)
+float chebyshevUpperBound(vec4 coords, float minVar, sampler2D vsm_shadow_map)
 {
     // We retrive the two moments previously stored (depth and depth*depth)
-    vec2 moments = blurTex2D(vsm_shadow_map0, coords.xy/coords.w, blurRadius, blurSteps).xy;
+    vec2 moments = blurTex2D(vsm_shadow_map, coords.xy/coords.w, blurRadius, blurSteps).xy;
 
     // Surface is fully lit. as the current fragment is before the light occluder
     if (coords.z/coords.w <= moments.x)
@@ -74,8 +83,7 @@ float chebyshevUpperBound(vec4 coords, float minVar)
     return p_max;
 }
 
-
-void main() {
+vec3 proceed (sampler2D vsm_shadow_map) {
     vec3 light_dir;
     if (light_type == 0) {
         light_dir = light_d;
@@ -86,11 +94,37 @@ void main() {
     float ambient_light = 0.1;
     float shade = ambient_light + max(dot(normalize(n), normalize(light_dir)), 0.0);
 
-    float shadow = chebyshevUpperBound(shadow_coord, 0.0001f);
+    float shadow = chebyshevUpperBound(shadow_coord, 0.0001f, vsm_shadow_map);
 
     if (use_color) {
-        color = shadow * shade * mesh_color;
+        return shadow * shade * mesh_color;
     } else {
-        color = shadow * shade * texture2D(tex, uv*texRatio).rgb;
+        return shadow * shade * texture2D(tex, uv*texRatio).rgb;
+    }
+}
+
+void main() {
+    if (useCsm) {
+        if (distToCamera < farPlane[0]) {
+            color = proceed(vsm_shadow_map0);
+        } else if (distToCamera < farPlane[1]) {
+            color = proceed(vsm_shadow_map1);
+        } else if (distToCamera < farPlane[2]) {
+            color = proceed(vsm_shadow_map2);
+        } else if (distToCamera < farPlane[3]) {
+            color = proceed(vsm_shadow_map3);
+        } else if (distToCamera < farPlane[4]) {
+            color = proceed(vsm_shadow_map4);
+        } else if (distToCamera < farPlane[5]) {
+            color = proceed(vsm_shadow_map5);
+        } else if (distToCamera < farPlane[6]) {
+            color = proceed(vsm_shadow_map6);
+        } else if (distToCamera < farPlane[7]) {
+            color = proceed(vsm_shadow_map7);
+        } else {
+            vec3(0);
+        }
+    } else {
+        color = proceed(vsm_shadow_map0);
     }
 }

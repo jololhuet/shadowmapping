@@ -26,16 +26,25 @@ uniform vec3 light_pos;
 uniform float bias;
 uniform bool usePolygonOffset;
 
+uniform bool useCsm;
+
 uniform sampler2D shadow_map0;
 uniform sampler2D shadow_map1;
 uniform sampler2D shadow_map2;
 uniform sampler2D shadow_map3;
+uniform sampler2D shadow_map4;
+uniform sampler2D shadow_map5;
+uniform sampler2D shadow_map6;
+uniform sampler2D shadow_map7;
+
+uniform float farPlane[8];
 
 in vec4 shadow_coord;
 in vec4 vpoint_MV;
 
-float M_PI = 3.14159265358979323846;
+in float distToCamera;
 
+float M_PI = 3.14159265358979323846;
 
 // Poisson disk sample locations.
 vec2 poisson_disk[16] = vec2[](
@@ -71,7 +80,7 @@ float randomAngle (vec4 pos, int i) {
     return randNumber(pos, i) * 6.283285;
 }
 
-void main() {
+vec3 proceed (sampler2D shadow_map) {
     vec3 light_dir;
     if (light_type == 0) {
         light_dir = light_d;
@@ -101,17 +110,42 @@ void main() {
 
     for (int i = 0; i < int(nIter); i++) {
         int index = i;
-//        int index = int(16.0*randNumber(shadow_coord, i))%16; // Will change with the camera moving
         vec2 rotatedOffset = vec2(poisson_disk[index].x * s, poisson_disk[index].y * c);
 
-        if (texture2D(shadow_map0, (shadow_coord.xy/shadow_coord.w + rotatedOffset/spread)).r < (shadow_coord.z - usedBias)/shadow_coord.w) {
+        if (texture2D(shadow_map, (shadow_coord.xy/shadow_coord.w + rotatedOffset/spread)).r < (shadow_coord.z - usedBias)/shadow_coord.w) {
             shadow -= (1.0/nIter);
         }
     }
 
     if (use_color) {
-        color = shadow * shade * mesh_color;
+        return shadow * shade * mesh_color;
     } else {
-        color = shadow * shade * texture2D(tex, uv*texRatio).rgb;
+        return shadow * shade * texture2D(tex, uv*texRatio).rgb;
+    }
+}
+
+void main() {
+    if (useCsm) {
+        if (distToCamera < farPlane[0]) {
+            color = proceed(shadow_map0);
+        } else if (distToCamera < farPlane[1]) {
+            color = proceed(shadow_map1);
+        } else if (distToCamera < farPlane[2]) {
+            color = proceed(shadow_map2);
+        } else if (distToCamera < farPlane[3]) {
+            color = proceed(shadow_map3);
+        } else if (distToCamera < farPlane[4]) {
+            color = proceed(shadow_map4);
+        } else if (distToCamera < farPlane[5]) {
+            color = proceed(shadow_map5);
+        } else if (distToCamera < farPlane[6]) {
+            color = proceed(shadow_map6);
+        } else if (distToCamera < farPlane[7]) {
+            color = proceed(shadow_map7);
+        } else {
+            vec3(0);
+        }
+    } else {
+        color = proceed(shadow_map0);
     }
 }

@@ -245,7 +245,10 @@ mat4 createLightProjection (vec3 center, float radius, bool isOrtho){
 }
 
 bool _show_frust_splits = false;
-int cur_num_splits = 8;
+int cur_num_splits = 4;
+int _prev_num_splits = cur_num_splits;
+float _split_lambda = 0.75;
+float _prev_split_lambda = 0.75;
 int _currentDisplayedFrust = 0;
 bool _from_light = false;
 float camera_near = 0.1f;
@@ -531,8 +534,7 @@ void updateSplitDist () {
     float near = camera_near;
     float far = camera_far;
 
-//    float lambda = 0.75f;
-    float lambda = 0.5f;
+    float lambda = _split_lambda;
     float ratio = far/near;
     fs[0].near = near;
     fs[0].fovy = 45.0f;
@@ -611,6 +613,11 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
 
     glUseProgram(shadow_pid);
     if (_use_csm) {
+        if (_prev_split_lambda != _split_lambda || _prev_num_splits != cur_num_splits) {
+            _prev_split_lambda = _split_lambda;
+            _prev_num_splits = cur_num_splits;
+            updateSplitDist();
+        }
 //        int i = _currentDisplayedFrust;
         for (int i = 0; i < cur_num_splits; i++) {
             sb[i].bind();
@@ -718,6 +725,8 @@ void init() {
         TwAddVarRW(bar, "VSM Blur #Steps", TW_TYPE_INT16, &vsmBlurSteps, " step=1 ");
 
         TwAddVarCB(bar, "Show Frust splits", TW_TYPE_BOOLCPP, ShowFrustSplitSet, ShowFrustSplitGet, NULL, NULL);
+        TwAddVarRW(bar, "CSM #splits", TW_TYPE_INT16, &cur_num_splits, " step=1 ");
+        TwAddVarRW(bar, "CSM splits lambda", TW_TYPE_FLOAT, &_split_lambda, " step=0.0500 ");
     }
 #endif
 
@@ -848,7 +857,7 @@ void init() {
 
     default_pid = depth_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < cur_num_splits; i++) {
+    for (int i = 0; i < MAX_SPLITS; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
         glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
@@ -856,7 +865,7 @@ void init() {
 
     default_pid = filter_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < cur_num_splits; i++) {
+    for (int i = 0; i < MAX_SPLITS; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
         glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
@@ -864,7 +873,7 @@ void init() {
 
     default_pid = bias_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < cur_num_splits; i++) {
+    for (int i = 0; i < MAX_SPLITS; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
         glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
@@ -872,7 +881,7 @@ void init() {
 
     default_pid = vsm_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < cur_num_splits; i++) {
+    for (int i = 0; i < MAX_SPLITS; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
         glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE10+i*/);
@@ -892,7 +901,7 @@ void init() {
 
     check_error_gl();
 
-    for (int i = 0; i < cur_num_splits; i++) {
+    for (int i = 0; i < MAX_SPLITS; i++) {
         sb[i].setSize(buffer_size, buffer_size);
         vec2 texs = sb[i].init(i);
         depth_tex[i] = texs[0];

@@ -15,6 +15,7 @@ out vec3 n;
 out vec2 uv;
 out vec4 shadow_coord;
 out vec4 vpoint_MV;
+out float distToCamera;
 
 void main() {
 
@@ -33,7 +34,6 @@ void main() {
     shadow_coord = depth_vp_offset * model * shadow_pos;
 
     gl_Position = projection * vpoint_mv;
-
-
+    distToCamera = gl_Position.z;
     uv = vtexcoord;
 }
