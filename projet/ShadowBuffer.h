@@ -24,7 +24,7 @@ public:
         this->_height = image_height;
     }
 
-    ///--- Warning: ovverrides viewport!!
+    ///--- Warning: overrides viewport!!
     void bind() {
         glGetIntegerv(GL_VIEWPORT, _previous_viewport);  // Store the previous viewport
         glBindFramebuffer(GL_FRAMEBUFFER, _fbo);

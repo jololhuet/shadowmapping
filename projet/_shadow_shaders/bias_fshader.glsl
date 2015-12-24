@@ -66,7 +66,7 @@ vec3 proceed (sampler2D shadow_map) {
 
     float shadow = 1.0;  // shading factor from the shadow (1.0 = no shadow, 0.0 = all dark)
 
-    if (texture2D(shadow_map0, (shadow_coord.xy / shadow_coord.w)).r < (shadow_coord.z-usedBias) / shadow_coord.w) {
+    if (texture2D(shadow_map, (shadow_coord.xy / shadow_coord.w)).r < (shadow_coord.z-usedBias) / shadow_coord.w) {
         shadow = clamp(shadowDarkness, 0, 0.95);
     }
 
@@ -78,55 +78,59 @@ vec3 proceed (sampler2D shadow_map) {
 }
 
 void main() {
-    if (distToCamera < farPlane[0]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map0);
+    if (useCsm) {
+        if (distToCamera < farPlane[0]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map0);
+            } else {
+                color = vec3(1, 0, 0);
+            }
+        } else if (distToCamera < farPlane[1]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map1);
+            } else {
+                color = vec3(0, 1, 0);
+            }
+        } else if (distToCamera < farPlane[2]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map2);
+            } else {
+                color = vec3(0, 0, 1);
+            }
+        } else if (distToCamera < farPlane[3]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map3);
+            } else {
+                color = vec3(1, 1, 0);
+            }
+        } else if (distToCamera < farPlane[4]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map4);
+            } else {
+                color = vec3(1, 0, 1);
+            }
+        } else if (distToCamera < farPlane[5]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map5);
+            } else {
+                color = vec3(0, 1, 1);
+            }
+        } else if (distToCamera < farPlane[6]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map6);
+            } else {
+                color = vec3(1, 0, 1);
+            }
+        } else if (distToCamera < farPlane[7]) {
+            if (!showFrustSplit){
+                color = proceed(shadow_map7);
+            } else {
+                color = vec3(1, 1, 0);
+            }
         } else {
-            color = vec3(1, 0, 0);
-        }
-    } else if (distToCamera < farPlane[1]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map1);
-        } else {
-            color = vec3(0, 1, 0);
-        }
-    } else if (distToCamera < farPlane[2]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map2);
-        } else {
-            color = vec3(0, 0, 1);
-        }
-    } else if (distToCamera < farPlane[3]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map3);
-        } else {
-            color = vec3(1, 1, 0);
-        }
-    } else if (distToCamera < farPlane[4]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map4);
-        } else {
-            color = vec3(1, 0, 1);
-        }
-    } else if (distToCamera < farPlane[5]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map5);
-        } else {
-            color = vec3(0, 1, 1);
-        }
-    } else if (distToCamera < farPlane[6]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map6);
-        } else {
-            color = vec3(1, 0, 1);
-        }
-    } else if (distToCamera < farPlane[7]) {
-        if (!showFrustSplit){
-            color = proceed(shadow_map7);
-        } else {
-            color = vec3(1, 1, 0);
+            vec3(0);
         }
     } else {
-        vec3(0);
+        color = proceed(shadow_map0);
     }
 }

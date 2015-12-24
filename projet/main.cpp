@@ -245,9 +245,9 @@ mat4 createLightProjection (vec3 center, float radius, bool isOrtho){
 }
 
 bool _show_frust_splits = false;
-int cur_num_splits = 2;
+int cur_num_splits = 8;
 int _currentDisplayedFrust = 0;
-bool _debugFrust = false;
+bool _from_light = false;
 float camera_near = 0.1f;
 float camera_far = 50.0f;
 void keyboard(int key, int action){
@@ -263,8 +263,8 @@ void keyboard(int key, int action){
      switch (key) {
         case 'V':
             if(action != GLFW_RELEASE) return;
-            _debugFrust = !_debugFrust;
-            cout << "Debug Frustum : " << _debugFrust << endl;
+            _from_light = !_from_light;
+            cout << "Debug Frustum : " << _from_light << endl;
             break;
 
         case 'C':
@@ -531,7 +531,8 @@ void updateSplitDist () {
     float near = camera_near;
     float far = camera_far;
 
-    float lambda = 0.75f;
+//    float lambda = 0.75f;
+    float lambda = 0.5f;
     float ratio = far/near;
     fs[0].near = near;
     fs[0].fovy = 45.0f;
@@ -610,6 +611,7 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
 
     glUseProgram(shadow_pid);
     if (_use_csm) {
+//        int i = _currentDisplayedFrust;
         for (int i = 0; i < cur_num_splits; i++) {
             sb[i].bind();
                 glActiveTexture(GL_TEXTURE0+20+i);
@@ -626,13 +628,11 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
 
                 fs[i].shadProj = applyCropMatrix(fs[i], light_view);
 
-                light_projection = fs[i].shadProj;
-
-                depth_vp = light_projection * light_view;
+                depth_vp = fs[i].shadProj * light_view;
                 glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
 
                 // Draw the scene !
-                drawScene(_use_big_scene, shadow_pid, view);
+                drawScene(_use_big_scene, shadow_pid, viewMat);
             sb[i].unbind();
         }
     } else {
@@ -679,11 +679,9 @@ mat4 cube_model_matrix;
 mat4 sphere_model_matrix;
 mat4 tea_model_matrix;
 mat4 wall_model_matrix;
-
 mat4 cone_model_matrix1;
 mat4 cone_model_matrix2;
 mat4 cone_model_matrix3;
-
 mat4 csm_model_matrix;
 void init() {
     // Light properties
@@ -807,8 +805,6 @@ void init() {
 
         vec3 cameraPosition = center + vec3(0.0f, ball_radius, 3.0f*ball_radius);
 
-        camera_near = 0.1;
-        camera_far = 100.0;
         // Setting the projection matrix such that the whole scene is centered
         projection = PerspectiveProjection(45.0f, (GLfloat)width/height, camera_near, camera_far);
 
@@ -852,7 +848,7 @@ void init() {
 
     default_pid = depth_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < MAX_SPLITS; i++) {
+    for (int i = 0; i < cur_num_splits; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
         glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
@@ -860,7 +856,7 @@ void init() {
 
     default_pid = filter_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < MAX_SPLITS; i++) {
+    for (int i = 0; i < cur_num_splits; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
         glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
@@ -868,7 +864,7 @@ void init() {
 
     default_pid = bias_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < MAX_SPLITS; i++) {
+    for (int i = 0; i < cur_num_splits; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
         glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
@@ -876,13 +872,13 @@ void init() {
 
     default_pid = vsm_pid;
     glUseProgram(default_pid);
-    for (int i = 0; i < MAX_SPLITS; i++) {
+    for (int i = 0; i < cur_num_splits; i++) {
         string sdm = "shadow_map" + to_string(i);
         const GLchar *shadowmap = sdm.c_str();
-        glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE1*/);
+        glUniform1i(glGetUniformLocation(default_pid, shadowmap), 10+i/*GL_TEXTURE10+i*/);
         string vsmsdm = "vsm_shadow_map" + to_string(i);
         const GLchar *vsmshadowmap = vsmsdm.c_str();
-        glUniform1i(glGetUniformLocation(default_pid, vsmshadowmap), 20+i /*GL_TEXTURE0*/);
+        glUniform1i(glGetUniformLocation(default_pid, vsmshadowmap), 20+i /*GL_TEXTURE20+i*/);
     }
 
     trackball_matrix = mat4::Identity();
@@ -1024,7 +1020,7 @@ void display() {
     check_error_gl();
 
     // Debug
-    if (_debugFrust) {
+    if (_from_light) {
         glUniformMatrix4fv(glGetUniformLocation(default_pid, "projection"), 1, GL_FALSE, fs[_currentDisplayedFrust].shadProj.data());
 
         drawScene(_use_big_scene, default_pid, light_view);
