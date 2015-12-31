@@ -1,7 +1,6 @@
 #version 330 core
 uniform bool isVsm;
 uniform mat4 depth_vp;
-uniform mat4 depth_vp_offset;
 uniform mat4 model;
 uniform mat4 view;
 

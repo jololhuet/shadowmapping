@@ -30,8 +30,10 @@ struct Frustum
     float far;
     float aspect;
     float fovy;
+    mat4 viewProj;
     vec3 points[8];
     mat4 shadProj;
+    mat4 depth_vp;
 };
 
 #define MAX_SPLITS 8
@@ -123,6 +125,17 @@ typedef Miniball::Miniball <
         Miniball::CoordAccessor<PointIterator, CoordIterator> >
         MB;
 
+
+void printHelpText() {
+    cout << "The keyboard tools you can use with explanation of what it's doing : (Press H to print it again)" << endl;
+    cout << "'1' / '2' / '3' -> Change shadow mode 'Bias' / 'PCF' / 'VSM' " << endl;
+    cout << "'4' -> Use Cascaded shadow map or not" << endl;
+    cout << "'W','A','S','D' -> Move the camera" << endl;
+    cout << "'I','J','K','L','N,'M' -> change the light source position in 3 dimensions" << endl;
+    cout << "'B' -> Swap between big and small scene" << endl;
+    cout << "'V' -> Display the scene from the light point of view" << endl;
+
+}
 
 mat4 PerspectiveProjection(float fovy, float aspect, float near, float far){
     float fovyDegrees = fovy  * (M_PI / 180.0f);
@@ -264,6 +277,9 @@ void keyboard(int key, int action){
         radius = lightRadiusSmallScene;
     }
      switch (key) {
+        case 'H':
+            printHelpText();
+            break;
         case 'V':
             if(action != GLFW_RELEASE) return;
             _from_light = !_from_light;
@@ -597,8 +613,6 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
     vec3 center;
     float radius;
 
-    mat4 depth_vp;
-
     if (!bigScene) {
         viewMat = view;
         trackball = trackball_matrix;
@@ -618,7 +632,6 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
             _prev_num_splits = cur_num_splits;
             updateSplitDist();
         }
-//        int i = _currentDisplayedFrust;
         for (int i = 0; i < cur_num_splits; i++) {
             sb[i].bind();
                 glActiveTexture(GL_TEXTURE0+20+i);
@@ -629,21 +642,21 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
                 glViewport(0,0,buffer_size,buffer_size);
 
                 mat4 projection_i = PerspectiveProjection(fs[i].fovy, fs[i].aspect, fs[i].near, fs[i].far);
+                fs[i].viewProj = projection_i;
 
                 // compute the camera frustum slice boundary points in world space
                 updateFrustumPoints(fs[i], projection_i, viewMat);
 
                 fs[i].shadProj = applyCropMatrix(fs[i], light_view);
 
-                depth_vp = fs[i].shadProj * light_view;
-                glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
+                fs[i].depth_vp = fs[i].shadProj * light_view;
+                glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, fs[i].depth_vp.data());
 
                 // Draw the scene !
                 drawScene(_use_big_scene, shadow_pid, viewMat);
             sb[i].unbind();
         }
     } else {
-
         light_projection = createLightProjection(center, radius, _light_type == 0);
 
         sb[0].bind();
@@ -654,14 +667,12 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
             glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
             glViewport(0,0,buffer_size,buffer_size);
 
-            depth_vp = light_projection * light_view;
-            glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
+            fs[0].depth_vp = light_projection * light_view;
+            glUniformMatrix4fv(glGetUniformLocation(shadow_pid, "depth_vp"), 1, GL_FALSE, fs[0].depth_vp.data());
 
             drawScene(_use_big_scene, shadow_pid, view);
         sb[0].unbind();
     }
-
-    return depth_vp;
 }
 
 mat4 createTransMatrix (float t1, float t2, float t3) {
@@ -913,6 +924,7 @@ void init() {
 
     // compute the z-distances for each split as seen in camera space
     updateSplitDist();
+    printHelpText();
 }
 
 // Draw the scene:
@@ -976,11 +988,10 @@ void display() {
     glUniform1f(glGetUniformLocation(shadow_pid, "bias"), (use_slope_bias)?bias:-1.0);
     glUniform1i(glGetUniformLocation(shadow_pid, "isVsm"), is_vsm);
 
-    mat4 depth_vp = makeShadowMap(_use_big_scene, _use_csm);
+    makeShadowMap(_use_big_scene, _use_csm);
 
     glUseProgram(default_pid);
 
-    glUniformMatrix4fv(glGetUniformLocation(default_pid, "projection"), 1, GL_FALSE, projection.data());
     glUniform1i(glGetUniformLocation(default_pid, "light_type"), _light_type);
     if (_light_type == 0) {
         glUniform3fv(glGetUniformLocation(default_pid, "light_d"), 1, light_dir.data());
@@ -990,12 +1001,21 @@ void display() {
 
     check_error_gl();
 
-    // Set matrix to transform from world space into NDC and then into [0, 1] ranges.
-    mat4 depth_vp_offset = offset_matrix * depth_vp;
+    if (_use_csm) {
+        for (int i = 0; i < cur_num_splits; i++) {
+            // Set matrix to transform from world space into NDC and then into [0, 1] ranges.
+//            int i = _currentDisplayedFrust;
+            mat4 depth_vp_offset_i = offset_matrix * fs[i].depth_vp;
+            string sdm_i = "depth_vp_offset" + to_string(i);
+            const GLchar *depthVpOffsetI = sdm_i.c_str();
+            glUniformMatrix4fv(glGetUniformLocation(default_pid, depthVpOffsetI), 1, GL_FALSE, depth_vp_offset_i.data());
+        }
+    } else {
+        mat4 depth_vp_offset = offset_matrix * fs[0].depth_vp;
+        glUniformMatrix4fv(glGetUniformLocation(default_pid, "depth_vp_offset"), 1, GL_FALSE, depth_vp_offset.data());
+    }
 
-    glUniformMatrix4fv(glGetUniformLocation(default_pid, "depth_vp"), 1, GL_FALSE, depth_vp.data());
-    glUniformMatrix4fv(glGetUniformLocation(default_pid, "depth_vp_offset"), 1, GL_FALSE, depth_vp_offset.data());
-
+    glUniformMatrix4fv(glGetUniformLocation(default_pid, "projection"), 1, GL_FALSE, projection.data());
     glUniform1f(glGetUniformLocation(default_pid, "bias"), bias);
 
     glUniform1i(glGetUniformLocation(default_pid, "useCsm"), _use_csm);
@@ -1028,7 +1048,7 @@ void display() {
 
     check_error_gl();
 
-    // Debug
+    // Debug see from light point of view
     if (_from_light) {
         glUniformMatrix4fv(glGetUniformLocation(default_pid, "projection"), 1, GL_FALSE, fs[_currentDisplayedFrust].shadProj.data());
 
