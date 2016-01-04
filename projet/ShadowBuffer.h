@@ -70,6 +70,8 @@ public:
             glActiveTexture(GL_TEXTURE0+10+i);
             glGenTextures(1, &_depth_tex);
             glBindTexture(GL_TEXTURE_2D, _depth_tex);
+            cout << i << " : " << endl;
+            cout << _depth_tex << endl;
 
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, _width, _height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 

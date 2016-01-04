@@ -633,9 +633,10 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
             updateSplitDist();
         }
         for (int i = 0; i < cur_num_splits; i++) {
+//            int i = _currentDisplayedFrust;
             sb[i].bind();
-                glActiveTexture(GL_TEXTURE0+20+i);
-                glBindTexture(GL_TEXTURE_2D, depthVSM_tex[i]);
+                //glActiveTexture(GL_TEXTURE0+20+i);
+                //glBindTexture(GL_TEXTURE_2D, depthVSM_tex[i]);
                 check_error_gl();
 
                 glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
@@ -645,7 +646,7 @@ mat4 makeShadowMap (bool bigScene, bool _use_csm) {
                 fs[i].viewProj = projection_i;
 
                 // compute the camera frustum slice boundary points in world space
-                updateFrustumPoints(fs[i], projection_i, viewMat);
+                updateFrustumPoints(fs[i], projection_i, viewMat*trackball);
 
                 fs[i].shadProj = applyCropMatrix(fs[i], light_view);
 

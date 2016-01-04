@@ -30,26 +30,27 @@ out vec2 uv;
 out vec4 shadow_coord;
 out vec4 vpoint_MV;
 
-out float distToCamera;
+//out float distToCamera;
 
 vec4 computeShadowCoord (vec4 shadow_pos) {
     vec4 sc;
+    float distToCamera = -vpoint_MV.z;
     if (useCsm) {
-        if (distToCamera <= farPlane[0]) {
+        if (distToCamera < farPlane[0]) {
             sc = depth_vp_offset0 * model * shadow_pos;
-        } else if (distToCamera <= farPlane[1]) {
+        } else if (distToCamera < farPlane[1]) {
             sc = depth_vp_offset1 * model * shadow_pos;
-        } else if (distToCamera <= farPlane[2]) {
+        } else if (distToCamera < farPlane[2]) {
             sc = depth_vp_offset2 * model * shadow_pos;
-        } else if (distToCamera <= farPlane[3]) {
+        } else if (distToCamera < farPlane[3]) {
             sc = depth_vp_offset3 * model * shadow_pos;
-        } else if (distToCamera <= farPlane[4]) {
+        } else if (distToCamera < farPlane[4]) {
             sc = depth_vp_offset4 * model * shadow_pos;
-        } else if (distToCamera <= farPlane[5]) {
+        } else if (distToCamera < farPlane[5]) {
             sc = depth_vp_offset5 * model * shadow_pos;
-        } else if (distToCamera <= farPlane[6]) {
+        } else if (distToCamera < farPlane[6]) {
             sc = depth_vp_offset6 * model * shadow_pos;
-        } else if (distToCamera <= farPlane[7]) {
+        } else if (distToCamera < farPlane[7]) {
             sc = depth_vp_offset7 * model * shadow_pos;
         } else {
             vec3(0);
@@ -71,7 +72,7 @@ void main() {
     vpoint_MV = vpoint_mv;
 
     gl_Position = projection * vpoint_mv;
-    distToCamera = gl_Position.z;
+//    distToCamera = gl_Position.z / gl_Position.w;
 
     if (useNormalOffset) {
         float normalOffsetScale = 0.0015;
